@@ -1,0 +1,148 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\BaseController;
+use App\Filters\V1\{{ class_name }}Filter;
+use App\Http\Requests\V1\{{ class_name }}Request\Store{{ class_name }}Request;
+use App\Http\Requests\V1\{{ class_name }}Request\Update{{ class_name }}Request;
+use App\Http\Requests\V1\{{ class_name }}Request\BulkStore{{ class_name }}Request;
+use App\Http\Resources\V1\{{ class_name }}Collection;
+use App\Http\Resources\V1\{{ class_name }}Resource;
+use App\Models\{{ class_name }};
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class {{ class_name }}Controller extends BaseController
+{
+    /**
+     * Display a listing of the {{ table_name }}s with their sections and subsections.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function index(Request $request)
+    {
+        $filter = new {{ class_name }}Filter();
+        $queryItems = $filter->transform($request);
+        $itemsQuery = {{ class_name }}::query()->with([
+            // Add relations here
+        ]);
+        if (!empty($queryItems)) {
+            $itemsQuery->where($queryItems);
+        }
+        $perPage = $request->input('per_page', 15);
+        $items = $itemsQuery->paginate($perPage);
+        return $this->respond(new {{ class_name }}Collection($items), '{{ class_name }}s retrieved successfully.', 200);
+    }
+
+    /**
+     * Store a newly created {{ table_name }} in storage.
+     *
+     * @param  \App\Http\Requests\V1\{{ class_name }}Request\Store{{ class_name }}Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function store(Store{{ class_name }}Request $request)
+    {
+        $validated = $request->validated();
+        $item = {{ class_name }}::create($validated);
+
+        return $this->respond(new {{ class_name }}Resource($item), '{{ class_name }} created successfully.', 201);
+    }
+
+    /**
+     * Display the specified {{ table_name }} with its sections and subsections.
+     *
+     * @param  \App\Models\{{ class_name }}  $item
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function show({{ class_name }} $item)
+    {
+        $item->load([
+            // Add relations here
+        ]);
+        return $this->respond(new {{ class_name }}Resource($item), '{{ class_name }} retrieved successfully.', 200);
+    }
+
+    /**
+     * Update the specified {{ table_name }} in storage.
+     *
+     * @param  \App\Http\Requests\V1\{{ class_name }}Request\Update{{ class_name }}Request  $request
+     * @param  \App\Models\{{ class_name }}  $item
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function update(Update{{ class_name }}Request $request, {{ class_name }} $item)
+    {
+        $validatedData = $request->validated();
+        $item->update($validatedData);
+
+        return $this->respond(new {{ class_name }}Resource($item), '{{ class_name }} updated successfully.', 200);
+    }
+
+    /**
+     * Remove the specified {{ table_name }} from storage.
+     *
+     * @param  \App\Models\{{ class_name }}  $item
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy({{ class_name }} $item)
+    {
+        $item->delete();
+        return $this->respond(null, '{{ class_name }} deleted successfully.', 204);
+    }
+
+    /**
+     * Bulk store multiple {{ table_name }}s in storage.
+     *
+     * @param  \App\Http\Requests\V1\{{ class_name }}Request\BulkStore{{ class_name }}Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function bulkStore(BulkStore{{ class_name }}Request $request)
+    {
+        try {
+            DB::beginTransaction();
+            
+            $items = collect($request->validated()['items'])->map(function ($data) {
+                return {{ class_name }}::create($data);
+            });
+            
+            DB::commit();
+            
+            return $this->respond(
+                new {{ class_name }}Collection($items), 
+                '{{ class_name }}s created successfully.', 
+                201
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->respondError('Failed to create {{ class_name }}s: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Bulk delete multiple {{ table_name }}s from storage.
+     *
+     * @param  Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function bulkDestroy(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'ids' => 'required|array',
+                'ids.*' => 'exists:{{ table_name }},id'
+            ]);
+
+            DB::beginTransaction();
+            
+            {{ class_name }}::whereIn('id', $validated['ids'])->delete();
+            
+            DB::commit();
+            
+            return $this->respond(null, '{{ class_name }}s deleted successfully.', 204);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->respondError('Failed to delete {{ class_name }}s: ' . $e->getMessage(), 500);
+        }
+    }
+}

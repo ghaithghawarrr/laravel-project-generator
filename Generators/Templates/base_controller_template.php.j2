@@ -1,0 +1,27 @@
+<?php
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
+
+class BaseController extends Controller
+{
+    /**
+     * Standardized response format.
+     *
+     * @param  mixed  $data
+     * @param  string  $message
+     * @param  int  $status
+     * @param  array|null  $errors
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function respond($data, $message, $status, $errors = null): JsonResponse
+    {
+        return response()->json([
+            'data' => $data,
+            'message' => $message,
+            'status' => $status,
+            'errors' => $errors
+        ], $status);
+    }
+}

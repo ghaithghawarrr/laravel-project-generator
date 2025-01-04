@@ -1,0 +1,139 @@
+<?php
+namespace App\Filters\{{ api_version }};
+
+use App\Filters\ApiFilter;
+use Illuminate\Validation\ValidationException;
+
+class {{ class_name }}Filter extends ApiFilter
+{
+    protected $safeParams = [
+        {% for param in safe_params %}
+        '{{ param.name }}' => ['{{ param.operators|join("', '") }}']{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    protected $columnMap = [
+        {% for column in column_map %}
+        '{{ column.param }}' => '{{ column.db_column }}'{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    protected $operatorMap = [
+        'eq' => '=',
+        'lt' => '<',
+        'lte' => '<=',
+        'gt' => '>',
+        'gte' => '>=',
+        'ne' => '!=',
+        'like' => 'LIKE',
+        'in' => 'IN'
+    ];
+
+    /**
+     * Transform the request parameters into database query conditions
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return array
+     * @throws ValidationException
+     */
+    public function transform($request)
+    {
+        try {
+            $eloQuery = [];
+
+            foreach ($this->safeParams as $param => $operators) {
+                $query = $request->query($param);
+
+                if (!isset($query)) {
+                    continue;
+                }
+
+                $this->validateParam($param, $query);
+
+                $column = $this->columnMap[$param] ?? $param;
+
+                foreach ($operators as $operator) {
+                    if (isset($query[$operator])) {
+                        $this->validateOperator($operator);
+                        $this->validateValue($query[$operator], $operator);
+                        
+                        $eloQuery[] = $this->buildQueryCondition($column, $operator, $query[$operator]);
+                    }
+                }
+            }
+
+            return $eloQuery;
+        } catch (\Exception $e) {
+            throw ValidationException::withMessages([
+                'filter' => ['Invalid filter parameters: ' . $e->getMessage()]
+            ]);
+        }
+    }
+
+    /**
+     * Validate a parameter
+     *
+     * @param string $param
+     * @param mixed $value
+     * @throws \InvalidArgumentException
+     */
+    protected function validateParam($param, $value)
+    {
+        if (!isset($this->safeParams[$param])) {
+            throw new \InvalidArgumentException("Invalid filter parameter: {$param}");
+        }
+    }
+
+    /**
+     * Validate an operator
+     *
+     * @param string $operator
+     * @throws \InvalidArgumentException
+     */
+    protected function validateOperator($operator)
+    {
+        if (!isset($this->operatorMap[$operator])) {
+            throw new \InvalidArgumentException("Invalid operator: {$operator}");
+        }
+    }
+
+    /**
+     * Validate a value based on operator
+     *
+     * @param mixed $value
+     * @param string $operator
+     * @throws \InvalidArgumentException
+     */
+    protected function validateValue($value, $operator)
+    {
+        if ($operator === 'in' && !is_array($value)) {
+            throw new \InvalidArgumentException("Value for 'in' operator must be an array");
+        }
+
+        if ($operator === 'like') {
+            // Prevent SQL injection in LIKE clauses
+            if (preg_match('/[%_\\\\]/', $value)) {
+                throw new \InvalidArgumentException("Invalid characters in LIKE value");
+            }
+        }
+    }
+
+    /**
+     * Build a query condition
+     *
+     * @param string $column
+     * @param string $operator
+     * @param mixed $value
+     * @return array
+     */
+    protected function buildQueryCondition($column, $operator, $value)
+    {
+        $dbOperator = $this->operatorMap[$operator];
+        
+        if ($operator === 'like') {
+            $value = "%{$value}%";
+        }
+
+        return [$column, $dbOperator, $value];
+    }
+}

@@ -1,0 +1,52 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class {{ class_name }} extends Model
+{
+    {% if use_soft_deletes %}use SoftDeletes;{% endif %}
+
+    protected $table = '{{ table_name }}';
+
+    {% if timestamps is defined %}
+    public $timestamps = {{ timestamps }};
+    {% endif %}
+
+    {% if date_format is defined %}
+    protected $dateFormat = '{{ date_format }}';
+    {% endif %}
+
+    {% if fillable_columns %}
+    protected $fillable = [
+        {% for column in fillable_columns %}
+        '{{ column }}'{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    {% endif %}
+
+    {% if guarded_columns %}
+    protected $guarded = [
+        {% for column in guarded_columns %}
+        '{{ column }}'{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    {% endif %}
+
+    {% if dates %}
+    protected $dates = [
+        {% for date in dates %}
+        '{{ date }}'{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    {% endif %}
+
+    {% for relationship in relationships %}
+    public function {{ relationship.method_name }}()
+    {
+        return $this->{{ relationship.relationship_type }}({{ relationship.related_model }}::class);
+    }
+    {% endfor %}
+}

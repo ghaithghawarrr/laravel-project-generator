@@ -1,0 +1,84 @@
+<?php
+
+namespace App\Http\Requests\V1\{{ class_name }}Request;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\ValidationException;
+
+class BulkStore{{ class_name }}Request extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true; // Modify based on your authorization logic
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Validation\Rule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:100'],
+            'items.*' => ['required', 'array'],
+            {% for rule in validation_rules %}
+            'items.*.{{ rule.field }}' => [{{ rule.rules|join(", ") }}]{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array
+     */
+    public function messages(): array
+    {
+        return [
+            'items.required' => 'At least one item is required',
+            'items.array' => 'Items must be provided as an array',
+            'items.min' => 'At least one item must be provided',
+            'items.max' => 'Maximum of 100 items can be processed at once',
+            {% for message in validation_messages %}
+            '{{ message.field }}' => '{{ message.message }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+    }
+
+    /**
+     * Handle a failed validation attempt.
+     *
+     * @param \Illuminate\Validation\Validator $validator
+     * @return void
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    protected function failedValidation(\Illuminate\Validation\Validator $validator)
+    {
+        throw ValidationException::withMessages([
+            'bulk_validation_error' => $validator->errors()->all()
+        ]);
+    }
+
+    /**
+     * Prepare the data for validation.
+     *
+     * @return void
+     */
+    protected function prepareForValidation()
+    {
+        // You can modify the input data here before validation if needed
+        if ($this->has('items')) {
+            $items = collect($this->items)->map(function ($item) {
+                // Add any data transformation logic here
+                return $item;
+            })->all();
+
+            $this->merge(['items' => $items]);
+        }
+    }
+}
